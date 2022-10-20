@@ -3,4 +3,3 @@ coredns
 coredns.exe
 build/
 release/
-vendor/

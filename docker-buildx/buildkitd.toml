@@ -1,0 +1,11 @@
+debug=true
+
+
+[registry."my.registry.cn"]
+  http = true
+  insecure = true
+  ca=["/home/harbor/ca/ca.crt"]
+  [[registry."my.registry.cn".keypair]]
+    key="/home/harbor/ca/my.registry.cn.key"
+    cert="/home/harbor/ca/my.registry.cn.cert"
+
