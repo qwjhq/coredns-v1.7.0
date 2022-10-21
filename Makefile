@@ -20,11 +20,12 @@ TARGETS                      := linux/amd64,linux/arm64 #debian darwin
 
 # Variables are related to images
 IMAGE_REGISTRY               := my.registry.cn
-IMAGE_PROJECT                := dkcloudv3
+IMAGE_PROJECT                := cloudv3
 TAG                          ?= v1.7.0
 DOCKERFILE_AMD64             := Dockerfile.amd64
 DOCKERFILE_ARM64             := Dockerfile.arm64
-
+DOCKERFILE_SYSTEM_BASE 		  := Dockerfile-system-base
+SYSTEM_BASE_IMAGE_NAME := $(IMAGE_REGISTRY)/library/debian:stable-slim-base
 
 # Variables are related to application
 GO_MAIN_FILE_NAME            := coredns.go
@@ -92,7 +93,7 @@ build-binary-indocker-amd64:
 
 .PHONY: build-binary-indocker-arm64
 build-binary-indocker-arm64:
-	docker buildx build --builder $(BUILDER_NAME) --platform darwin/arm64 -f ./Dockerfile.binary \
+	docker buildx build --builder $(BUILDER_NAME) --platform linux/arm64 -f ./Dockerfile.binary \
 	--build-arg GOARCH=arm64 \
 	--build-arg GO_VERSION=$(GO_VERSION) \
 	--build-arg CGO_ENABLED=0 \
@@ -100,14 +101,25 @@ build-binary-indocker-arm64:
 	--build-arg IMAGE_REGISTRY=$(IMAGE_REGISTRY) \
 	--build-arg APPLICATION_NAME=$(APPLICATION_NAME)-arm64 \
 	--build-arg COMMIT_ID=$(GIT_SHA_SHORT)+$(GIT_TREE_STATUS) \
+	--build-arg TARGETOS=linux \
+	--build-arg BUILDOPTS=-v \
 	--output type=local,dest=./local_bin .
 
 
-.PHONY: build-binary-indokcer-multi
-build-binary-indokcer-multi: build-binary-indocker-amd64
-build-binary-indokcer-multi: build-binary-indocker-arm64
+.PHONY: build-all
+build-all: build-binary-indocker-amd64
+build-all: build-binary-indocker-arm64
 
 
+.PHONY: multi-system-base
+multi-system-base:
+	docker buildx build --builder $(BUILDER_NAME) \
+      --platform linux/amd64 \
+      -o $(DOCKER_BUILDX_OUTPUT) \
+      -t $(SYSTEM_BASE_IMAGE_NAME)  \
+      -f $(DOCKERFILE_SYSTEM_BASE) \
+      --build-arg  IMAGE_REGISTRY=$(IMAGE_REGISTRY) .
+	docker push $(SYSTEM_BASE_IMAGE_NAME)
 
 ##########################################################
 # Multiple image local building pipline
@@ -116,7 +128,7 @@ build-binary-indokcer-multi: build-binary-indocker-arm64
 
 .PHONY: build-${APPLICATION_NAME}-amd64
 build-${APPLICATION_NAME}-amd64:
-	docker buildx build --builder $(BUILDER_NAME) --platform darwin/amd64 \
+	docker buildx build --builder $(BUILDER_NAME) --platform linux/amd64 \
 	-o $(DOCKER_BUILDX_OUTPUT) \
 	-t $(IMAGE_REGISTRY)/$(IMAGE_PROJECT)/$(APPLICATION_NAME):$(TAG)-amd64  \
 	-f $(DOCKERFILE_AMD64) \
@@ -127,11 +139,12 @@ build-${APPLICATION_NAME}-amd64:
 	--build-arg IMAGE_REGISTRY=$(IMAGE_REGISTRY) \
 	--build-arg APPLICATION_NAME=$(APPLICATION_NAME) \
 	--build-arg FILE_NAME=$(GO_MAIN_FILE_NAME) \
+	--build-arg BASE_IMAGE=$(SYSTEM_BASE_IMAGE_NAME) \
 	--build-arg COMMIT_ID=$(GIT_SHA_SHORT)+$(GIT_TREE_STATUS) .
 
 .PHONY: build-${APPLICATION_NAME}-arm64
 build-${APPLICATION_NAME}-arm64:
-	docker buildx build --builder $(BUILDER_NAME) --platform darwin/arm64 \
+	docker buildx build --builder $(BUILDER_NAME) --platform linux/arm64 \
 	-o $(DOCKER_BUILDX_OUTPUT) \
 	-t $(IMAGE_REGISTRY)/$(IMAGE_PROJECT)/$(APPLICATION_NAME):$(TAG)-arm64  \
 	-f $(DOCKERFILE_ARM64) \
@@ -142,6 +155,7 @@ build-${APPLICATION_NAME}-arm64:
 	--build-arg IMAGE_REGISTRY=$(IMAGE_REGISTRY) \
 	--build-arg APPLICATION_NAME=$(APPLICATION_NAME) \
 	--build-arg FILE_NAME=$(GO_MAIN_FILE_NAME) \
+	--build-arg BASE_IMAGE=$(SYSTEM_BASE_IMAGE_NAME) \
 	--build-arg COMMIT_ID=$(GIT_SHA_SHORT)+$(GIT_TREE_STATUS) .
 
 
@@ -191,7 +205,7 @@ manifest-auto: docker-manifest-push
 
 VERSIONS_NEED        := 1.12.17 1.13.15 1.16.15 1.15.15
 ORIGINAL_IMAGE_NAME  := golang
-IMAGE_NAME           := my.registry.cn/library/golang
+IMAGE_NAME           := $(IMAGE_REGISTRY)/library/golang
 ARCH                 :=$(shell docker info | grep Architecture | awk '{ print $$NF}')
 
 ifeq ($(ARCH),x86_64)

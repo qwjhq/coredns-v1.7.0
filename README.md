@@ -7,20 +7,16 @@
 make multi-driver
 
 # 一键容器内构建不同架构二进制并保存到宿主机指定位置
-make build-binary-indokcer-multi
+make build-all
+
+# 一键构建业务基础镜像
+make multi-system-base
 
 # 一键构建不同架构镜像
-根据变量配置自行匹配
+make build-all-images
 
-# 一键推送
-make docker-push
-
-# 一键创建manifest
-make docker-manifest-create-insecure
-
-# 一键推送manifest
-make docker-manifest-push-insecure
-
+# 一键push镜像 生成manifest至镜像仓库
+make manifest-auto
 
 # 常见问题
 

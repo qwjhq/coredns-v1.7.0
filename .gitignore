@@ -3,3 +3,4 @@ coredns
 coredns.exe
 build/
 release/
+.idea/
